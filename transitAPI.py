@@ -47,7 +47,7 @@ def prettyprint(data):
 	return json.dumps(data, indent = 4, sort_keys = True)
 
 
-def directionToCode(cardinalDirection):
+def directionToId(cardinalDirection):
 	"""
 	Converts cardinal direction to Metro Transit direction code, 
 	or None if invalid direction passed
@@ -101,20 +101,20 @@ def lookupRouteId(routeName, routesDict):
 	
 def convertDirection(cardinalDirection):
 	"""
-	Returns Metro Transit directionCode 
-	or exits if invalid code passed
+	Returns Metro Transit directionId 
+	or exits if invalid direction passed
 
 	:param cardinalDirection: str that is north, south, east, west
 	:rtype: str
 	"""
 
-	directionCode = directionToCode(cardinalDirection)
-	if not directionCode:
+	directionId = directionToId(cardinalDirection)
+	if not directionId:
 		sys.exit(
 			"Could not recognize direction \"{0}\".\n".format(cardinalDirection) +
 			"Please use north, south, east, or west.")
 
-	return directionCode
+	return directionId
 
 def convertStopToId(stopName, stopDict):
 	"""
@@ -214,28 +214,14 @@ def getStops(route, direction):
 	:rypte: dict
 	"""
 
-	directionCode = convertDirection(direction)
+	directionId = convertDirection(direction)
 
 	# Search for routeID by route description
 	routesDict = getRoutes()
 	routeID = convertRouteToId(route, routesDict)
-	#routeID = ""
-
-	# If route cannot be converted to an int, 
-	# must be route description, so lookup route ID
-	# try:
-	# 	routeID = route
-	# 	int(route)
-	# except:
-	# 	routesDict = getRoutes()
-	# 	routeID = lookupRouteId(route, routesDict)
-	#
-	# 	if str.isEmpty(routeID):
-	# 		sys.exit(
-	# 			"Could not find route name \"{0}\".".format(route))
-
+	
 	url = (NEXTRIP_URI + "Stops/" +
-		routeID + "/" + directionCode + JSON_FORMAT)
+		routeID + "/" + directionId + JSON_FORMAT)
 
 	return transitRequest(url)
 
@@ -258,15 +244,56 @@ def getDepartures(route, direction, stop):
 	routesDict = getRoutes()
 	routeID = convertRouteToId(route, routesDict)
 
-	directionCode = convertDirection(direction)
+	directionId = convertDirection(direction)
 
 	url = (NEXTRIP_URI +
-		routeID + "/" + directionCode + "/" + stopID + JSON_FORMAT)
+		routeID + "/" + directionId + "/" + stopID + JSON_FORMAT)
 
 	return transitRequest(url)
 
-	
-def getNextDeparture(route, direction, stop):
+def getAllRoutes():
+	allRoutes = getRoutes()
+
+	listedRoutes = ""
+	if allRoutes:
+		for route in allRoutes:
+			listedRoutes += route["Description"] + "\n"
+
+	else:
+		sys.exit(
+			"API had trouble getting all stops.\n")
+
+	return listedRoutes
+
+def getAllStops(route, direction):
+
+	allStops = getStops(route, direction)
+
+	listedStops = ""
+	if allStops:
+		for stop in allStops:
+			#print("stop:", stop)
+			listedStops += stop["Text"] + "\n"
+
+	# getStops had a problem with the request
+	else:
+		validDirectionsForRoute = getDirections(route)
+
+		# If route is valid, must be an invalid direction for this route
+		if validDirectionsForRoute:
+			sys.exit(
+				"API had trouble finding stops.\n" +
+				"Are you sure route {0} travels {1}?".format(route, direction))
+
+		# Route isn't valid, so give up
+		else:
+			sys.exit(
+				"API couldn't find information on route called \"" + route + "\".\n" +
+				"Run NextBus with no arguments to view all routes.\n")
+
+	return listedStops
+
+def getNextDeparture(route, direction, stop, quantity = 1):
 	"""
 	Gets time (in human readable text) of next departure for route
 	or none if route has no more departures today.
@@ -275,15 +302,24 @@ def getNextDeparture(route, direction, stop):
 	:param route: str of route description
 	:param direction: str of cardinal direction
 	:param stop: str of stop description (often intersection of streets)
+	:param quantity: int of how many future departures to fetch, 1 by default
 	:rtype dict:
 	"""
 
 	# Retrieve all departures for this route, and return first one 
 	allDepartures = getDepartures(route, direction, stop)
-	nextDeparture = None
+	soonDepartures = ""
+
+	# soonDeparture = allDepartures[0]["DepartureText"]
 
 	# If departures dict found, return the first departure's time
 	if allDepartures:
-		nextDeparture = allDepartures[0]["DepartureText"]
+		# Fetch quantity of departures requested, or all remaining departures
+		# if more departures requested than exist for today
 
-	return nextDeparture
+		index = 0
+		while (index < quantity) and (index < len(allDepartures)):
+			soonDepartures += allDepartures[index]["DepartureText"] + "\n"
+			index += 1
+
+	return soonDepartures

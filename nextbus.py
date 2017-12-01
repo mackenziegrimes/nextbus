@@ -40,7 +40,13 @@ class NextBus:
 
 def main(args):
 	# Test that enough arguments were passed
-	if len(args) < 2:
+	if len(args) < 1:
+		sys.exit(
+			"Sorry, we're missing some arguments.\n" +
+			"Usage:\tnextbus <BUS ROUTE> [BUS STOP NAME] [DIRECTION]\n")
+
+
+	elif len(args) < 2:
 		sys.exit(
 			"Sorry, we're missing some arguments.\n" +
 			"Usage:\tnextbus <BUS ROUTE> <BUS STOP NAME> <DIRECTION>\n")
